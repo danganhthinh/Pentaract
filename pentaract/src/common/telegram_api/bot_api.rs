@@ -2,7 +2,8 @@ use reqwest::multipart;
 use uuid::Uuid;
 
 use crate::{
-    common::types::ChatId, errors::PentaractResult,
+    common::types::ChatId,
+    errors::{PentaractError, PentaractResult},
     services::storage_workers_scheduler::StorageWorkersScheduler,
 };
 
@@ -28,13 +29,20 @@ impl<'t> TelegramBotApi<'t> {
         storage_id: Uuid,
     ) -> PentaractResult<UploadSchema> {
         let chat_id = {
-            // inserting 100 between minus sign and chat id
-            // cause telegram devs are complete retards and it works this way only
-            //
-            // https://stackoverflow.com/a/65965402/12255756
-
-            let n = chat_id.abs().checked_ilog10().unwrap_or(0) + 1;
-            chat_id - (100 * ChatId::from(10).pow(n))
+            // Check if chat_id already has the -100 prefix (supergroup/channel format)
+            if chat_id.to_string().starts_with("-100") {
+                // Already in correct format, use as-is
+                tracing::debug!("[Telegram API] Chat ID already in supergroup format: {}", chat_id);
+                chat_id
+            } else {
+                // Apply transformation for regular group chats
+                // inserting 100 between minus sign and chat id
+                // https://stackoverflow.com/a/65965402/12255756
+                let n = chat_id.abs().checked_ilog10().unwrap_or(0) + 1;
+                let transformed = chat_id - (100 * ChatId::from(10).pow(n));
+                tracing::debug!("[Telegram API] Transformed chat ID from {} to {}", chat_id, transformed);
+                transformed
+            }
         };
 
         let token = self.scheduler.get_token(storage_id).await?;
@@ -51,10 +59,13 @@ impl<'t> TelegramBotApi<'t> {
             .send()
             .await?;
 
-        match response.error_for_status() {
-            // https://stackoverflow.com/a/32679930/12255756
-            Ok(r) => Ok(r.json::<UploadBodySchema>().await?.result.document),
-            Err(e) => Err(e.into()),
+        let status = response.status();
+        if status.is_success() {
+            Ok(response.json::<UploadBodySchema>().await?.result.document)
+        } else {
+            let error_body = response.text().await.unwrap_or_else(|_| "Unable to read response body".to_string());
+            tracing::error!("[Telegram API] {} - Response: {}", status, error_body);
+            Err(PentaractError::TelegramAPIError(format!("{} - {}", status, error_body)))
         }
     }
 
