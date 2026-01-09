@@ -338,9 +338,66 @@ const API = {
 	},
 }
 
+/////////////////////////////////////////////////////////////
+////  PUBLIC FILES (No Auth Required)
+/////////////////////////////////////////////////////////////
+
+/**
+ *
+ * @param {string} storage_id
+ * @param {string} path
+ * @returns {Promise<FSElement[]>}
+ */
+const getPublicFSLayer = async (storage_id, path) => {
+	return await apiRequest(
+		`/public/files/${storage_id}/tree/${path}`,
+		'get',
+		undefined
+	)
+}
+
+/**
+ *
+ * @param {string} storage_id
+ * @param {string} path
+ * @returns {Promise<import("../../../pentaract/src/models/files.rs").File>}
+ */
+const getPublicFile = async (storage_id, path) => {
+	return await apiRequest(
+		`/public/files/${storage_id}/info/${path}`,
+		'get',
+		undefined
+	)
+}
+
+/**
+ *
+ * @param {string} storage_id
+ * @param {string} path
+ * @returns {Promise<Blob>}
+ */
+const downloadPublic = async (storage_id, path) => {
+	const response = await apiRequest(
+		`/public/files/${storage_id}/download/${path}`,
+		'get',
+		undefined,
+		undefined,
+		true
+	)
+
+	return await response.blob()
+}
+
+const PublicAPI = {
+	getPublicFSLayer,
+	downloadPublic,
+	getPublicFile,
+}
+
 const getAuthToken = () => {
 	const [store, _setStore] = createLocalStore()
 	return `Bearer ${store.access_token}`
 }
 
 export default API
+export { PublicAPI }

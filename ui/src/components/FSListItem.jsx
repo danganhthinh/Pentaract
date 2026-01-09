@@ -11,10 +11,10 @@ import MoreVertIcon from '@suid/icons-material/MoreVert'
 import DownloadIcon from '@suid/icons-material/Download'
 import InfoIcon from '@suid/icons-material/Info'
 import DeleteIcon from '@suid/icons-material/Delete'
-import { createSignal } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 
-import API from '../api'
+import API, { PublicAPI } from '../api'
 import ActionConfirmDialog from './ActionConfirmDialog'
 import FileInfoDialog from './FileInfo'
 
@@ -23,6 +23,7 @@ import FileInfoDialog from './FileInfo'
  * @property {import("../api").FSElement} fsElement
  * @property {string} storageId
  * @property {() => {}} onDelete
+ * @property {boolean} isPublic
  */
 
 /**
@@ -46,12 +47,18 @@ const FSListItem = (props) => {
 
 	const handleNavigate = () => {
 		if (!props.fsElement.is_file) {
-			navigate(`/storages/${props.storageId}/files/${props.fsElement.path}`)
+			if (props.isPublic) {
+				navigate(`/download/${props.storageId}/${props.fsElement.path}`)
+			} else {
+				navigate(`/storages/${props.storageId}/files/${props.fsElement.path}`)
+			}
 		}
 	}
 
 	const download = async () => {
-		const blob = await API.files.download(params.id, props.fsElement.path)
+		const blob = props.isPublic
+			? await PublicAPI.downloadPublic(props.storageId, props.fsElement.path)
+			: await API.files.download(params.id, props.fsElement.path)
 
 		const href = URL.createObjectURL(blob)
 		const a = Object.assign(document.createElement('a'), {
@@ -120,12 +127,14 @@ const FSListItem = (props) => {
 					<ListItemText>Download</ListItemText>
 				</MenuItem>
 
-				<MenuItem onClick={openActionConfirmDialog}>
-					<ListItemIcon>
-						<DeleteIcon fontSize="small" />
-					</ListItemIcon>
-					<ListItemText>Delete</ListItemText>
-				</MenuItem>
+				<Show when={!props.isPublic}>
+					<MenuItem onClick={openActionConfirmDialog}>
+						<ListItemIcon>
+							<DeleteIcon fontSize="small" />
+						</ListItemIcon>
+						<ListItemText>Delete</ListItemText>
+					</MenuItem>
+				</Show>
 			</MenuMUI>
 
 			<ActionConfirmDialog

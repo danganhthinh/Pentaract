@@ -222,6 +222,44 @@ impl<'d> FilesService<'d> {
         }
     }
 
+    pub async fn download_public(
+        &self,
+        path: &str,
+        storage_id: Uuid,
+    ) -> PentaractResult<Vec<u8>> {
+        // 1. path validation
+        if !Self::validate_path(path) {
+            return Err(PentaractError::InvalidPath);
+        }
+
+        // 2. getting file by path
+        let file = self.repo.get_file_by_path(path, storage_id).await?;
+
+        // 3. sending task to storage manager
+        let (resp_tx, resp_rx) = oneshot::channel();
+
+        let message = {
+            let download_file_data = DownloadFileData {
+                file_id: file.id,
+                storage_id,
+                user_id: Uuid::nil(), // Use nil UUID for public download
+            };
+            ClientMessage {
+                data: ClientData::DownloadFile(download_file_data),
+                tx: resp_tx,
+            }
+        };
+
+        tracing::debug!("sending task to manager");
+        let _ = self.tx.send(message).await;
+
+        // 4. waiting for a storage manager result
+        match resp_rx.await.unwrap().data {
+            StorageManagerData::DownloadFile(r) => r,
+            _ => unimplemented!(),
+        }
+    }
+
     pub async fn list_dir(
         self,
         storage_id: Uuid,
@@ -230,6 +268,14 @@ impl<'d> FilesService<'d> {
     ) -> PentaractResult<Vec<FSElement>> {
         check_access(&self.access_repo, user.id, storage_id, &AccessType::R).await?;
 
+        self.repo.list_dir(storage_id, path).await
+    }
+
+    pub async fn list_dir_public(
+        self,
+        storage_id: Uuid,
+        path: &str,
+    ) -> PentaractResult<Vec<FSElement>> {
         self.repo.list_dir(storage_id, path).await
     }
 
@@ -243,6 +289,29 @@ impl<'d> FilesService<'d> {
         check_access(&self.access_repo, user.id, storage_id, &AccessType::R).await?;
 
         self.repo.search(search_path, path, storage_id).await
+    }
+
+    pub async fn search_public(
+        self,
+        storage_id: Uuid,
+        path: &str,
+        search_path: &str,
+    ) -> PentaractResult<Vec<SearchFSElement>> {
+        self.repo.search(search_path, path, storage_id).await
+    }
+
+    pub async fn get_file_info_public(
+        &self,
+        path: &str,
+        storage_id: Uuid,
+    ) -> PentaractResult<File> {
+        // 1. path validation
+        if !Self::validate_path(path) {
+            return Err(PentaractError::InvalidPath);
+        }
+
+        // 2. getting file by path
+        self.repo.get_file_by_path(path, storage_id).await
     }
 
     pub async fn rename(

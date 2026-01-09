@@ -16,7 +16,7 @@ impl InFile {
     }
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow, Serialize)]
 pub struct File {
     pub id: uuid::Uuid,
     pub path: String,

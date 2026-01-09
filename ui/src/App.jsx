@@ -12,6 +12,8 @@ import Files from './pages/Files'
 import UploadFileTo from './pages/Files/UploadFileTo'
 import Register from './pages/Register'
 import NotFound from './pages/404'
+import PublicDownload from './pages/PublicDownload'
+import PublicFile from './pages/PublicFile'
 
 const theme = createTheme({
 	palette: {
@@ -30,6 +32,9 @@ const App = () => {
 			<Routes>
 				<Route path="/login" component={Login} />
 				<Route path="/register" component={Register} />
+				<Route path="/download/:storageId" component={PublicDownload} />
+				<Route path="/download/:storageId/*path" component={PublicDownload} />
+				<Route path="/file/:storageId/*path" component={PublicFile} />
 
 				<Route path="/" component={BasicLayout}>
 					<Route path="/" element={<Navigate href="/storages" />} />

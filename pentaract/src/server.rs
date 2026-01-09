@@ -10,8 +10,8 @@ use tower_http::{
 use crate::{
     common::routing::app_state::AppState,
     routers::{
-        auth::AuthRouter, storage_workers::StorageWorkersRouter, storages::StoragesRouter,
-        users::UsersRouter,
+        auth::AuthRouter, public_files::PublicFilesRouter,
+        storage_workers::StorageWorkersRouter, storages::StoragesRouter, users::UsersRouter,
     },
 };
 
@@ -46,6 +46,10 @@ impl Server {
             .nest(
                 "/storage_workers",
                 StorageWorkersRouter::get_router(app_state.clone()),
+            )
+            .nest(
+                "/public/files",
+                PublicFilesRouter::get_router(app_state.clone()),
             )
             .layer(ConcurrencyLimitLayer::new(workers.into()))
             .layer(app_cors)
